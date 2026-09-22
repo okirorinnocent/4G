@@ -1,127 +1,102 @@
-import re
+import os
 import streamlit as st
-from chatterbot import ChatBot
-from chatterbot.trainers import ListTrainer
+from google import genai
+from google.genai import types
 
-st.set_page_config(page_title="WhatsApp ChatterBot App", layout="centered")
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="AI Chat Assistant",
+    page_icon="🤖",
+    layout="centered"
+)
 
-st.title("WhatsApp Chatbot Trainer & Interface")
+st.title("🤖 Modern AI Assistant")
+st.caption("Powered by Google GenAI & Streamlit")
 
+# --- Initialize API Client ---
+# Fetches key from Streamlit secrets (or environment variables)
+api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-# --- Text Cleaning Helper Functions ---
-def remove_chat_metadata(content):
-    """Removes timestamps and user metadata from WhatsApp chat export string[cite: 1]."""
-    # Pattern: 14/08/2025, 9:19 at night - monicaiyb:[cite: 1]
-    pattern = r"\d+/\d+/\d+,\s\d+:\d+(?:\s(?:am|pm|at\s(?:night|morning|afternoon|noon)))?\s-\s[^:]+:\s"
-    cleaned_corpus = re.sub(pattern, "", content)
-    return tuple(cleaned_corpus.split("\n"))
-
-
-def remove_non_message_text(export_text_lines):
-    """Filters out non-message content and media notifications[cite: 1]."""
-    messages = export_text_lines[1:-1]
-    filter_out_msgs = ("<Media omitted>",)
-    return tuple((msg.strip() for msg in messages if msg.strip() not in filter_out_msgs))
+if not api_key:
+    st.error("🔑 API Key not found. Please add `GEMINI_API_KEY` to your Streamlit secrets or environment variables.")
+    st.stop()
 
 
-def full_clean(
-    messages,
-    lowercase=True,
-    remove_url=True,
-    remove_whitespace=True,
-    remove_empty=True,
-):
-    """Applies general text cleaning routines[cite: 1]."""
-    cleaned = []
-    for msg in messages:
-        text = msg
-        if lowercase:
-            text = text.lower()
-        if remove_url:
-            text = re.sub(r"http\S+|www\.\S+", "", text)
-        if remove_whitespace:
-            text = " ".join(text.split())
-        if remove_empty and not text:
-            continue
-        cleaned.append(text)
-    return cleaned
+@st.cache_resource
+def get_genai_client(key: str):
+    return genai.Client(api_key=key)
 
 
-def prepare_for_chatbot(raw_chat_text):
-    """Pipeline to prepare raw WhatsApp text for ChatterBot training[cite: 1]."""
-    message_corpus = remove_chat_metadata(raw_chat_text)
-    cleaned_corpus = remove_non_message_text(message_corpus)
-    final_corpus = full_clean(
-        cleaned_corpus,
-        lowercase=True,
-        remove_url=True,
-        remove_whitespace=True,
-        remove_empty=True,
-    )
-    return final_corpus
+client = get_genai_client(api_key)
 
-
-# --- Streamlit Session State Management ---
-if "chatbot" not in st.session_state:
-    st.session_state.chatbot = ChatBot("WhatsAppBot")
-
-if "trained" not in st.session_state:
-    st.session_state.trained = False
-
+# --- Session State Initialization ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# --- Sidebar Controls ---
+with st.sidebar:
+    st.header("Settings")
 
-# --- Sidebar: Dataset Upload & Training ---
-st.sidebar.header("1. Upload & Train Model")
-uploaded_file = st.sidebar.file_uploader(
-    "Upload chat.txt export", type=["txt"])
+    system_instruction = st.text_area(
+        "System Instruction",
+        value="You are a helpful, precise, and concise AI assistant.",
+        help="Guide how the chatbot behaves."
+    )
 
-if uploaded_file is not None:
-    raw_text = uploaded_file.read().decode("utf-8")
-    cleaned_messages = prepare_for_chatbot(raw_text)
+    if st.button("Clear Chat History", type="secondary"):
+        st.session_state.messages = []
+        st.rerun()
 
-    st.sidebar.subheader("Dataset Statistics")
-    st.sidebar.write(f"**Total messages:** {len(cleaned_messages)}")
-
-    if cleaned_messages:
-        total_words = sum(len(msg.split()) for msg in cleaned_messages)
-        avg_words = total_words / len(cleaned_messages)
-        st.sidebar.write(f"**Total words:** {total_words}")
-        st.sidebar.write(f"**Average words per message:** {avg_words:.2f}")
-
-    if st.sidebar.button("Train Chatbot"):
-        with st.spinner("Training ChatterBot..."):
-            trainer = ListTrainer(st.session_state.chatbot)
-            trainer.train(list(cleaned_messages))
-            st.session_state.trained = True
-        st.sidebar.success("Training complete!")
-
-
-# --- Main Interface: Chat Section ---
-st.header("2. Chat with the Bot")
-
-# Display previous conversation history
+# --- Render Existing Chat Messages ---
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# User Chat Input
-if prompt := st.chat_input("Type your message..."):
-    # Add user message to display
+# --- Handle User Input & Stream Response ---
+if prompt := st.chat_input("How can I help you today?"):
+    # Display user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Generate response
+    # Generate assistant response with streaming
     with st.chat_message("assistant"):
-        if not st.session_state.trained:
-            response_text = "The chatbot hasn't been trained yet. Please upload a chat file and click 'Train Chatbot' first."
-        else:
-            bot_response = st.session_state.chatbot.get_response(prompt)
-            response_text = str(bot_response)
+        message_placeholder = st.empty()
+        full_response = ""
 
-        st.markdown(response_text)
-        st.session_state.messages.append(
-            {"role": "assistant", "content": response_text}
-        )
+        try:
+            # Format chat history into contents for the API call
+            contents = []
+            for msg in st.session_state.messages:
+                role = "user" if msg["role"] == "user" else "model"
+                contents.append(
+                    types.Content(
+                        role=role,
+                        parts=[types.Part.from_text(text=msg["content"])]
+                    )
+                )
+
+            # Request response stream from Gemini
+            response_stream = client.models.generate_content_stream(
+                model="gemini-2.5-flash",
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=0.7,
+                )
+            )
+
+            for chunk in response_stream:
+                if chunk.text:
+                    full_response += chunk.text
+                    message_placeholder.markdown(full_response + "▌")
+
+            message_placeholder.markdown(full_response)
+
+            # Save assistant response to session
+            st.session_state.messages.append(
+                {"role": "assistant", "content": full_response})
+
+        except Exception as e:
+            st.error(
+                f"An error occurred while generating a response: {str(e)}")
