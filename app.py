@@ -5,67 +5,71 @@ from google.genai import types
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="OKIROR'S AI — Intelligent Assistant",
+    page_title="OKIROR AI — Intelligent Assistant",
     page_icon="✨",
     layout="centered",
     initial_sidebar_state="expanded"
 )
 
-# --- Custom Styling (CSS Injection) ---
+# --- Custom Styling (Fixed Text Contrast) ---
 st.markdown("""
 <style>
-    /* Main app padding & clean background accent */
+    /* Main app background */
     .stApp {
-        background: linear-gradient(135deg, #0e1117 0%, #161b22 100%);
+        background: #0e1117;
+        color: #f3f4f6;
     }
 
     /* Target headers */
-    h1 {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        font-weight: 700;
-        letter-spacing: -0.5px;
-        background: linear-gradient(90deg, #38bdf8, #818cf8);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+    h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
+        font-family: 'Inter', -apple-system, sans-serif;
     }
 
-    /* Styled metric status cards */
-    div[data-testid="stMetricValue"] {
-        font-size: 1.1rem !important;
-        font-weight: 600;
-    }
-
-    /* Glassmorphism sidebar styling */
-    section[data-testid="stSidebar"] {
-        background-color: rgba(15, 23, 42, 0.7);
-        backdrop-filter: blur(12px);
-        border-right: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    /* Custom Chat Container styling */
+    /* Force all chat message text to be crisp light text */
     div[data-testid="stChatMessage"] {
+        background-color: #1e293b !important;
         border-radius: 12px;
         padding: 1rem;
         margin-bottom: 0.75rem;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 1px solid #334155 !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     }
 
-    /* Subtle divider */
-    hr {
-        margin: 1.5rem 0;
-        border-color: rgba(255, 255, 255, 0.08);
+    div[data-testid="stChatMessage"] * {
+        color: #f8fafc !important;
     }
 
-    /* Polish buttons */
-    div.stButton > button {
-        border-radius: 8px;
-        font-weight: 500;
-        transition: all 0.2s ease;
+    /* Sidebar text colors */
+    section[data-testid="stSidebar"] {
+        background-color: #0f172a !important;
+        border-right: 1px solid #1e293b;
     }
-    div.stButton > button:hover {
-        border-color: #38bdf8;
-        color: #38bdf8;
+
+    section[data-testid="stSidebar"] * {
+        color: #e2e8f0 !important;
+    }
+
+    /* Text area and input field formatting */
+    textarea, input {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        border: 1px solid #475569 !important;
+    }
+
+    /* Metric card text fix */
+    div[data-testid="stMetricValue"] {
+        color: #38bdf8 !important;
+        font-weight: 600;
+    }
+    
+    div[data-testid="stMetricLabel"] {
+        color: #94a3b8 !important;
+    }
+
+    /* Subtitles and captions */
+    .stCaption {
+        color: #94a3b8 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -93,7 +97,7 @@ if "messages" not in st.session_state:
 # --- Header Section ---
 col1, col2 = st.columns([3, 1])
 with col1:
-    st.title("✨ Aura AI")
+    st.title("✨ OKIROR'S AI")
     st.caption("Next-Gen Intelligent Workspace Companion")
 with col2:
     st.metric(label="Model", value="Gemini 3.6 Flash")
@@ -102,13 +106,12 @@ st.divider()
 
 # --- Sidebar Controls ---
 with st.sidebar:
-    st.image("https://img.icons8.com/gradient/96/000000/bot.png", width=64)
     st.markdown("### Control Panel")
     st.markdown("Customize assistant parameters and conversation state.")
 
     system_instruction = st.text_area(
         "Persona & Instructions",
-        value="You are Aura, a high-level AI assistant. Provide concise, modern, accurate, and professional answers.",
+        value="You are OKIROR'S AI, a high-level AI assistant. Provide concise, modern, accurate, and professional answers.",
         help="Defines how the chatbot speaks and formats output.",
         height=120
     )
@@ -130,7 +133,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # --- User Input & Response Generation ---
-if prompt := st.chat_input("Ask Aura anything..."):
+if prompt := st.chat_input("Ask OKIROR'S AI anything..."):
     # Append & display user prompt
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"):
