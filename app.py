@@ -5,7 +5,7 @@ from google.genai import types
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Aura AI — Intelligent Assistant",
+    page_title="OKIROR'S AI — Intelligent Assistant",
     page_icon="✨",
     layout="centered",
     initial_sidebar_state="expanded"
